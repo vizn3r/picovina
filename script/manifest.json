@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Picovina Auto Marker",
+  "version": "1.0",
+  "description": "Automatically marks correct answers on the test page.",
+  "permissions": [
+    "scripting",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_title": "Mark Correct Answers",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

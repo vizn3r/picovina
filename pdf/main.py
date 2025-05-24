@@ -1,46 +1,59 @@
-from pdfminer.high_level import extract_pages
-from pdfminer.layout import LTChar, LTTextLineHorizontal, LTTextBoxHorizontal
-from pathlib import Path
+# #00b050
+import fitz  # PyMuPDF
+import string
 
 
-def is_colored(char):
-    try:
-        return char.graphicstate.ncolor != (0.0, 0.0, 0.0)
-    except AttributeError:
-        return False
+def is_green(color_int):
+    r = (color_int >> 16) & 0xFF
+    g = (color_int >> 8) & 0xFF
+    b = color_int & 0xFF
+    target = (0, 176, 80)
+    dist = ((r - target[0]) ** 2 + (g - target[1]) ** 2 + (b - target[2]) ** 2) ** 0.5
+    return dist < 30
 
 
-def extract_colored_lines(pdf_path):
-    colored_lines = []
-    for page_layout in extract_pages(pdf_path):
-        for element in page_layout:
-            if isinstance(element, LTTextBoxHorizontal):
-                for line in element:
-                    if isinstance(line, LTTextLineHorizontal):
-                        if any(isinstance(c, LTChar) and is_colored(c) for c in line):
-                            colored_lines.append(line.get_text().strip())
-    return colored_lines
+def clean_text(text):
+    allowed = (
+        string.ascii_letters
+        + string.digits
+        + string.punctuation
+        + " \t\n\ráäčďéíľĺňóôŕšťúýžÁÄČĎÉÍĽĹŇÓÔŔŠŤÚÝŽ"
+    )  # add accented chars if you want
+    # Or simply allow all printable unicode characters, skipping control chars and weird symbols:
+    # A more general approach:
+    return "".join(
+        ch for ch in text if ch.isprintable() and not ch.isspace() or ch == " "
+    )
+    # You can customize this, but .isprintable() filters out control chars like ''
 
 
-def save_lines_to_file(lines, output_path):
-    with open(output_path, "w", encoding="utf-8") as f:
-        for line in lines:
+def extract_green_text(pdf_path, txt_path):
+    doc = fitz.open(pdf_path)
+    green_lines = []
+
+    for page in doc:
+        blocks = page.get_text("dict")["blocks"]
+        for b in blocks:
+            if b["type"] != 0:
+                continue
+            for line in b["lines"]:
+                green_text_spans = []
+                for span in line["spans"]:
+                    if is_green(span["color"]):
+                        cleaned = clean_text(span["text"]).strip()
+                        if cleaned:
+                            green_text_spans.append(cleaned)
+                if green_text_spans:
+                    line_text = " ".join(green_text_spans).strip()
+                    if line_text:
+                        green_lines.append(line_text)
+
+    with open(txt_path, "w", encoding="utf-8") as f:
+        for line in green_lines:
             f.write(line + "\n")
+
+    print(f"Extracted {len(green_lines)} green lines to {txt_path}")
 
 
 if __name__ == "__main__":
-    input_pdf = "ans.pdf"  # Replace with your PDF
-    output_txt = "ans.txt"  # Output file
-
-    if not Path(input_pdf).exists():
-        print(f"Error: File not found: {input_pdf}")
-        exit(1)
-
-    print(f"Extracting colored lines from: {input_pdf}")
-    lines = extract_colored_lines(input_pdf)
-
-    if lines:
-        save_lines_to_file(lines, output_txt)
-        print(f"Saved {len(lines)} colored line(s) to: {output_txt}")
-    else:
-        print("No colored lines found.")
+    extract_green_text("ans.pdf", "ans.txt")
